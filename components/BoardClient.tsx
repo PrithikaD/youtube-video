@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import CardModal from "./CardModal";
+import YouTubeEmbed from "./YouTubeEmbed";
+import { getYouTubeThumbnailUrl, getYouTubeVideoId } from "../lib/youtube";
 
 type Card = {
   id: string;
@@ -18,10 +20,14 @@ export default function BoardClient({
   boardTitle,
   boardSlug,
   cards,
+  profileName,
+  profileAvatarUrl,
 }: {
   boardTitle: string;
   boardSlug: string;
   cards: Card[];
+  profileName?: string | null;
+  profileAvatarUrl?: string | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -32,44 +38,97 @@ export default function BoardClient({
 
   return (
     <main className="p-8">
-      <h1 className="text-4xl font-bold">{boardTitle}</h1>
+      <div className="flex items-center gap-3">
+        <div className="h-12 w-12 overflow-hidden rounded-full bg-gray-100">
+          {profileAvatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profileAvatarUrl}
+              alt={profileName ?? "Profile"}
+              className="h-full w-full object-cover"
+            />
+          ) : null}
+        </div>
+        <div className="text-sm text-gray-700">
+          {profileName ?? "Unknown"}
+        </div>
+      </div>
+
+      <h1 className="mt-3 text-4xl font-bold">{boardTitle}</h1>
       <p className="mt-2 text-gray-600">/{boardSlug}</p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((card) => (
-          <button
-            key={card.id}
-            onClick={() => setSelectedId(card.id)}
-            className="text-left rounded-2xl border bg-white p-4 shadow-sm hover:shadow-md transition"
-          >
-            {card.thumbnail_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={card.thumbnail_url}
-                alt={card.title ?? "Card"}
-                className="h-40 w-full rounded-xl object-cover"
-              />
-            ) : (
-              <div className="h-40 w-full rounded-xl bg-gray-100" />
-            )}
+        {cards.map((card) => {
+          const videoId = card.youtube_video_id ?? getYouTubeVideoId(card.url);
+          const isYouTube = Boolean(videoId);
+          const thumbnailUrl =
+            card.thumbnail_url ?? (videoId ? getYouTubeThumbnailUrl(videoId) : null);
 
-            <div className="mt-3">
-              <h2 className="font-semibold line-clamp-2">
-                {card.title ?? card.url}
-              </h2>
-              {card.creator_note ? (
-                <p className="mt-2 text-sm text-gray-600 line-clamp-3">
-                  {card.creator_note}
-                </p>
-              ) : null}
+          if (!isYouTube) {
+            return (
+              <button
+                key={card.id}
+                onClick={() => setSelectedId(card.id)}
+                className="text-left rounded-2xl border bg-white p-4 shadow-sm hover:shadow-md transition"
+              >
+                {thumbnailUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={thumbnailUrl}
+                    alt={card.title ?? "Card"}
+                    className="h-40 w-full rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="h-40 w-full rounded-xl bg-gray-100" />
+                )}
+
+                <div className="mt-3">
+                  <h2 className="font-semibold line-clamp-2">
+                    {card.title ?? "Untitled"}
+                  </h2>
+                  {card.creator_note ? (
+                    <p className="mt-2 text-sm text-gray-600 line-clamp-3">
+                      {card.creator_note}
+                    </p>
+                  ) : null}
+                </div>
+              </button>
+            );
+          }
+
+          return (
+            <div
+              key={card.id}
+              className="rounded-2xl border bg-white p-4 shadow-sm hover:shadow-md transition"
+            >
+              <YouTubeEmbed
+                url={card.url}
+                title={card.title}
+                videoId={videoId}
+                startSeconds={card.youtube_timestamp ?? 0}
+                thumbnailUrl={thumbnailUrl}
+                className="h-40 w-full rounded-xl"
+              />
+
+              <button
+                onClick={() => setSelectedId(card.id)}
+                className="mt-3 w-full text-left"
+              >
+                <h2 className="font-semibold line-clamp-2">
+                  {card.title ?? "Untitled"}
+                </h2>
+                {card.creator_note ? (
+                  <p className="mt-2 text-sm text-gray-600 line-clamp-3">
+                    {card.creator_note}
+                  </p>
+                ) : null}
+              </button>
             </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
 
       <CardModal card={selectedCard} onClose={() => setSelectedId(null)} />
     </main>
   );
 }
-
-

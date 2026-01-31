@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseBrowserClient";
+import YouTubeEmbed from "../../components/YouTubeEmbed";
+import { getYouTubeThumbnailUrl, getYouTubeVideoId } from "../../lib/youtube";
+import { slugify } from "../../lib/slug";
 
 type Board = {
   id: string;
@@ -20,6 +23,10 @@ type Card = {
 };
 
 export default function DashboardClient({ userId }: { userId: string }) {
+  const [profileName, setProfileName] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+
   const [boards, setBoards] = useState<Board[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState<string>("");
 
@@ -29,9 +36,25 @@ export default function DashboardClient({ userId }: { userId: string }) {
   const [cards, setCards] = useState<Card[]>([]);
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
-  const [thumbnailUrl, setThumbnailUrl] = useState("");
 
   const [status, setStatus] = useState<string | null>(null);
+
+  async function loadProfile() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    if (data) {
+      setProfileName(data.full_name ?? "");
+      setProfileAvatarUrl(data.avatar_url ?? null);
+    }
+  }
 
   async function loadBoards() {
     const { data, error } = await supabase
@@ -63,20 +86,23 @@ export default function DashboardClient({ userId }: { userId: string }) {
   }
 
   useEffect(() => {
+    loadProfile();
     loadBoards();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (selectedBoardId) loadCards(selectedBoardId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBoardId]);
 
   async function createBoard(e: React.FormEvent) {
     e.preventDefault();
     setStatus(null);
 
-    if (!boardTitle.trim() || !boardSlug.trim()) {
+    const title = boardTitle.trim();
+    const slug = slugify(boardSlug);
+
+    if (!title || !slug) {
       setStatus("Please provide a title and a slug.");
       return;
     }
@@ -85,8 +111,8 @@ export default function DashboardClient({ userId }: { userId: string }) {
       .from("boards")
       .insert({
         creator_id: userId,
-        title: boardTitle.trim(),
-        slug: boardSlug.trim(),
+        title,
+        slug,
         is_public: true,
       })
       .select("id,title,slug,is_public")
@@ -125,7 +151,7 @@ export default function DashboardClient({ userId }: { userId: string }) {
       board_id: selectedBoardId,
       url: url.trim(),
       creator_note: note.trim() ? note.trim() : null,
-      thumbnail_url: thumbnailUrl.trim() ? thumbnailUrl.trim() : null,
+      thumbnail_url: null,
     });
 
     if (error) {
@@ -135,23 +161,142 @@ export default function DashboardClient({ userId }: { userId: string }) {
 
     setUrl("");
     setNote("");
-    setThumbnailUrl("");
     await loadCards(selectedBoardId);
     setStatus("Card added ✅");
+  }
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus(null);
+
+    let avatarUrl = profileAvatarUrl;
+
+    if (profileFile) {
+      const ext = profileFile.name.split(".").pop() || "jpg";
+      const path = `${userId}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, profileFile, { upsert: true });
+
+      if (uploadError) {
+        setStatus(uploadError.message);
+        return;
+      }
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      avatarUrl = data.publicUrl;
+    }
+
+    const { error } = await supabase.from("profiles").upsert({
+      id: userId,
+      full_name: profileName.trim() ? profileName.trim() : null,
+      avatar_url: avatarUrl ?? null,
+    });
+
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+
+    setProfileFile(null);
+    setStatus("Profile saved ✅");
+  }
+
+  async function deleteBoard() {
+    if (!selectedBoardId) return;
+    const board = boards.find((b) => b.id === selectedBoardId);
+    const ok = window.confirm(
+      `Delete board "${board?.title ?? "Untitled"}" and all its cards? This cannot be undone.`
+    );
+    if (!ok) return;
+    setStatus(null);
+
+    const { error: cardsError } = await supabase
+      .from("cards")
+      .delete()
+      .eq("board_id", selectedBoardId);
+    if (cardsError) {
+      setStatus(cardsError.message);
+      return;
+    }
+
+    const { error: boardError } = await supabase
+      .from("boards")
+      .delete()
+      .eq("id", selectedBoardId);
+    if (boardError) {
+      setStatus(boardError.message);
+      return;
+    }
+
+    setSelectedBoardId("");
+    await loadBoards();
+    setCards([]);
+    setStatus("Board deleted ✅");
+  }
+  async function deleteCard(cardId: string) {
+    if (!selectedBoardId) return;
+    const ok = window.confirm("Delete this card? This cannot be undone.");
+    if (!ok) return;
+    setStatus(null);
+
+    const { error } = await supabase.from("cards").delete().eq("id", cardId);
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    await loadCards(selectedBoardId);
+    setStatus("Card deleted ✅");
   }
 
   return (
     <main className="p-8 max-w-3xl space-y-10">
       <header className="space-y-1">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-gray-600">Create boards and add cards.</p>
+        <h1 className="text-3xl font-bold">Your profile</h1>
+        <p className="text-gray-600">Add your name and profile photo.</p>
         {status ? <div className="text-sm text-red-600">{status}</div> : null}
       </header>
 
       <section className="space-y-3">
+        <form onSubmit={saveProfile} className="space-y-3">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 overflow-hidden rounded-full bg-gray-100">
+              {profileAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profileAvatarUrl}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : null}
+            </div>
+            <div className="flex-1 space-y-2">
+              <input
+                className="border rounded-xl px-3 py-2 w-full"
+                placeholder="Your name"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                className="text-sm"
+                onChange={(e) =>
+                  setProfileFile(e.target.files?.[0] ?? null)
+                }
+              />
+            </div>
+          </div>
+          <button className="rounded-xl bg-black text-white px-4 py-2">
+            Save profile
+          </button>
+        </form>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-xl font-semibold">Your boards</h2>
 
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <select
             className="border rounded-xl px-3 py-2"
             value={selectedBoardId}
@@ -166,14 +311,24 @@ export default function DashboardClient({ userId }: { userId: string }) {
           </select>
 
           {selectedBoardId ? (
-            <a
-              className="text-sm underline"
-              href={`/board/${boards.find((b) => b.id === selectedBoardId)?.slug ?? ""}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View public page →
-            </a>
+            <>
+              <a
+                className="text-sm underline"
+                href={`/board/${encodeURIComponent(
+                  boards.find((b) => b.id === selectedBoardId)?.slug ?? ""
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View public page →
+              </a>
+              <button
+                className="text-sm text-red-600 hover:underline"
+                onClick={deleteBoard}
+              >
+                Delete board
+              </button>
+            </>
           ) : null}
         </div>
 
@@ -206,12 +361,6 @@ export default function DashboardClient({ userId }: { userId: string }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
-          <input
-            className="border rounded-xl px-3 py-2 w-full"
-            placeholder="Thumbnail URL (optional)"
-            value={thumbnailUrl}
-            onChange={(e) => setThumbnailUrl(e.target.value)}
-          />
           <textarea
             className="border rounded-xl px-3 py-2 w-full"
             placeholder="Note (optional)"
@@ -230,21 +379,47 @@ export default function DashboardClient({ userId }: { userId: string }) {
           ) : (
             <ul className="space-y-2">
               {cards.map((c) => (
-                <li key={c.id} className="border rounded-2xl p-3">
-                  <a className="underline" href={c.url} target="_blank" rel="noreferrer">
-                    {c.url}
-                  </a>
-                  {c.creator_note ? (
-                    <div className="text-sm text-gray-700 mt-1">{c.creator_note}</div>
-                  ) : null}
-                  {c.thumbnail_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={c.thumbnail_url}
-                      alt=""
-                      className="mt-2 w-full max-w-sm rounded-xl border"
-                    />
-                  ) : null}
+                <li key={c.id} className="border rounded-2xl bg-white p-3">
+                  {(() => {
+                    const videoId = getYouTubeVideoId(c.url);
+                    const thumbnailUrl =
+                      c.thumbnail_url ??
+                      (videoId ? getYouTubeThumbnailUrl(videoId) : null);
+
+                    return videoId ? (
+                      <YouTubeEmbed
+                        url={c.url}
+                        videoId={videoId}
+                        thumbnailUrl={thumbnailUrl}
+                        className="h-44 w-full max-w-sm rounded-xl border"
+                      />
+                    ) : thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={thumbnailUrl}
+                        alt=""
+                        className="w-full max-w-sm rounded-xl border object-cover"
+                      />
+                    ) : (
+                      <div className="h-44 w-full max-w-sm rounded-xl border bg-gray-100" />
+                    );
+                  })()}
+
+                  <div className="mt-2">
+                    {c.creator_note ? (
+                      <div className="text-sm text-gray-700 mt-1">
+                        {c.creator_note}
+                      </div>
+                    ) : null}
+                    <div className="mt-2">
+                      <button
+                        className="text-sm text-red-600 hover:underline"
+                        onClick={() => deleteCard(c.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>

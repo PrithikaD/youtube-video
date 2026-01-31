@@ -16,7 +16,7 @@ export default async function DashboardPage() {
   return (
     <main className="p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-3xl font-bold">Profile</h1>
         <Link className="text-sm underline" href="/logout">
           Log out
         </Link>

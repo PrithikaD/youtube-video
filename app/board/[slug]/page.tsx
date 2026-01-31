@@ -6,12 +6,13 @@ export default async function BoardPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeURIComponent(rawSlug);
   const supabase = await createSupabaseServerClient();
 
   const { data: board, error: boardError } = await supabase
     .from("boards")
-    .select("id, title, slug, is_public")
+    .select("id, title, slug, is_public, creator_id")
     .eq("slug", slug)
     .single();
 
@@ -43,11 +44,19 @@ export default async function BoardPage({
     );
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, avatar_url")
+    .eq("id", board.creator_id)
+    .maybeSingle();
+
   return (
     <BoardClient
       boardTitle={board.title}
       boardSlug={board.slug}
       cards={cards ?? []}
+      profileName={profile?.full_name ?? null}
+      profileAvatarUrl={profile?.avatar_url ?? null}
     />
   );
 }

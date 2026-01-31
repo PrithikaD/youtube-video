@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { getYouTubeEmbedUrl, getYouTubeVideoId } from "../lib/youtube";
 
 type Card = {
   id: string;
@@ -12,21 +13,6 @@ type Card = {
   youtube_video_id?: string | null;
   youtube_timestamp?: number | null;
 };
-
-function getYouTubeVideoId(url: string): string | null {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) {
-      return u.pathname.slice(1) || null;
-    }
-    if (u.hostname.includes("youtube.com")) {
-      return u.searchParams.get("v");
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 export default function CardModal({
   card,
@@ -51,7 +37,7 @@ export default function CardModal({
   const isYouTube = Boolean(videoId);
 
   const embedSrc = isYouTube
-    ? `https://www.youtube.com/embed/${videoId}?start=${start}&autoplay=1`
+    ? getYouTubeEmbedUrl({ videoId: videoId!, startSeconds: start, autoplay: true })
     : "";
 
   return (
@@ -68,9 +54,8 @@ export default function CardModal({
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="min-w-0">
             <div className="truncate font-semibold">
-              {card.title ?? card.url}
+              {card.title ?? "Untitled"}
             </div>
-            <div className="truncate text-sm text-gray-600">{card.url}</div>
           </div>
           <button
             onClick={onClose}
@@ -88,7 +73,7 @@ export default function CardModal({
                 className="h-full w-full rounded-xl"
                 src={embedSrc}
                 title="YouTube player"
-                allow="autoplay; encrypted-media; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
               />
             ) : (
@@ -128,4 +113,3 @@ export default function CardModal({
     </div>
   );
 }
-
