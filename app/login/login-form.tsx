@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { supabase } from "../../lib/supabaseBrowserClient";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -36,7 +37,12 @@ export default function LoginForm() {
       return;
     }
 
-    router.push(mode === "signup" ? "/dashboard?onboarding=1" : "/dashboard");
+    const nextParam = searchParams.get("next");
+    const nextUrl =
+      nextParam && nextParam.startsWith("/") ? nextParam : null;
+    const fallback =
+      mode === "signup" ? "/dashboard?onboarding=1" : "/dashboard";
+    router.push(nextUrl ?? fallback);
     router.refresh();
   }
 
@@ -100,7 +106,7 @@ export default function LoginForm() {
         disabled={loading}
         className="w-full rounded-xl bg-black px-4 py-2 text-white disabled:opacity-50"
       >
-        {loading ? "…" : mode === "login" ? "Log in" : "Create account"}
+        {loading ? "..." : mode === "login" ? "Log in" : "Create account"}
       </button>
     </form>
   );

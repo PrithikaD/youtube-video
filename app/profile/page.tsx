@@ -32,6 +32,7 @@ export default async function ProfilePage({
   let boardsQuery = supabase
     .from("boards")
     .select("id,title,slug,description,is_public")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (!isAllBoards) {

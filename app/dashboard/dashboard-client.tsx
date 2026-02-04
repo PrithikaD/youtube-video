@@ -14,6 +14,7 @@ type Board = {
   slug: string;
   is_public: boolean;
   description: string | null;
+  deleted_at?: string | null;
 };
 
 type Card = {
@@ -24,6 +25,7 @@ type Card = {
   creator_note: string | null;
   thumbnail_url: string | null;
   created_at: string;
+  deleted_at?: string | null;
 };
 
 export default function DashboardClient() {
@@ -47,6 +49,8 @@ export default function DashboardClient() {
   const [boardEditIsPublic, setBoardEditIsPublic] = useState(true);
 
   const [cards, setCards] = useState<Card[]>([]);
+  const [deletedCards, setDeletedCards] = useState<Card[]>([]);
+  const [showDeletedCards, setShowDeletedCards] = useState(false);
   const [url, setUrl] = useState("");
   const [cardTitle, setCardTitle] = useState("");
   const [cardTitleTouched, setCardTitleTouched] = useState(false);
@@ -55,6 +59,18 @@ export default function DashboardClient() {
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
 
   const [status, setStatus] = useState<string | null>(null);
+  const statusKind = status?.includes("✅") ? "success" : "error";
+  const [showTrash, setShowTrash] = useState(false);
+  const [deletedBoards, setDeletedBoards] = useState<Board[]>([]);
+  const [confirm, setConfirm] = useState<
+    | null
+    | {
+        title: string;
+        message: string;
+        confirmLabel?: string;
+        onConfirm: () => void | Promise<void>;
+      }
+  >(null);
 
   async function loadProfile(currentUserId: string) {
     const { data, error } = await supabase
@@ -79,6 +95,7 @@ export default function DashboardClient() {
       .from("boards")
       .select("id,title,slug,is_public,description")
       .eq("creator_id", currentUserId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -90,11 +107,30 @@ export default function DashboardClient() {
     return data ?? [];
   }
 
+  async function loadDeletedBoards(currentUserId: string) {
+    const { data, error } = await supabase
+      .from("boards")
+      .select("id,title,slug,is_public,description,deleted_at")
+      .eq("creator_id", currentUserId)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+
+    if (error) {
+      setStatus(error.message);
+      return [];
+    }
+    setDeletedBoards(data ?? []);
+    return data ?? [];
+  }
+
   async function loadCards(boardId: string) {
     const { data, error } = await supabase
       .from("cards")
-      .select("id,board_id,url,title,creator_note,thumbnail_url,created_at")
+      .select(
+        "id,board_id,url,title,creator_note,thumbnail_url,created_at,deleted_at"
+      )
       .eq("board_id", boardId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -102,6 +138,23 @@ export default function DashboardClient() {
       return;
     }
     setCards(data ?? []);
+  }
+
+  async function loadDeletedCards(boardId: string) {
+    const { data, error } = await supabase
+      .from("cards")
+      .select(
+        "id,board_id,url,title,creator_note,thumbnail_url,created_at,deleted_at"
+      )
+      .eq("board_id", boardId)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+
+    if (error) {
+      setStatus(error.message);
+      return;
+    }
+    setDeletedCards(data ?? []);
   }
 
   async function loadUser() {
@@ -130,6 +183,16 @@ export default function DashboardClient() {
   useEffect(() => {
     if (selectedBoardId) loadCards(selectedBoardId);
   }, [selectedBoardId]);
+
+  useEffect(() => {
+    if (!showDeletedCards || !selectedBoardId) return;
+    loadDeletedCards(selectedBoardId);
+  }, [showDeletedCards, selectedBoardId]);
+
+  useEffect(() => {
+    if (!showTrash || !userId) return;
+    loadDeletedBoards(userId);
+  }, [showTrash, userId]);
 
   useEffect(() => {
     const board = boards.find((b) => b.id === selectedBoardId);
@@ -332,50 +395,123 @@ export default function DashboardClient() {
   async function deleteBoard() {
     if (!selectedBoardId) return;
     const board = boards.find((b) => b.id === selectedBoardId);
-    const ok = window.confirm(
-      `Delete board "${board?.title ?? "Untitled"}" and all its cards? This cannot be undone.`
-    );
-    if (!ok) return;
+    setConfirm({
+      title: "Delete board?",
+      message: `Delete board "${board?.title ?? "Untitled"}" and all its cards? This cannot be undone.`,
+      confirmLabel: "Delete board",
+      onConfirm: async () => {
+        setConfirm(null);
+        setStatus(null);
+        const deletedAt = new Date().toISOString();
+
+        const { error: cardsError } = await supabase
+          .from("cards")
+          .update({ deleted_at: deletedAt })
+          .eq("board_id", selectedBoardId);
+        if (cardsError) {
+          setStatus(cardsError.message);
+          return;
+        }
+
+        const { error: boardError } = await supabase
+          .from("boards")
+          .update({ deleted_at: deletedAt })
+          .eq("id", selectedBoardId);
+        if (boardError) {
+          setStatus(boardError.message);
+          return;
+        }
+
+        setSelectedBoardId("");
+        if (userId) {
+          await loadBoards(userId);
+        }
+        setCards([]);
+        setStatus("Board deleted ✅");
+        if (userId) {
+          await loadDeletedBoards(userId);
+        }
+      },
+    });
+  }
+  async function deleteCard(cardId: string) {
+    if (!selectedBoardId) return;
+    setConfirm({
+      title: "Delete card?",
+      message: "Delete this card? This cannot be undone.",
+      confirmLabel: "Delete card",
+      onConfirm: async () => {
+        setConfirm(null);
+        setStatus(null);
+        const deletedAt = new Date().toISOString();
+
+        const { error } = await supabase
+          .from("cards")
+          .update({ deleted_at: deletedAt })
+          .eq("id", cardId);
+        if (error) {
+          setStatus(error.message);
+          return;
+        }
+        await loadCards(selectedBoardId);
+        setStatus("Card deleted ✅");
+        if (showDeletedCards) {
+          await loadDeletedCards(selectedBoardId);
+        }
+      },
+    });
+  }
+
+  async function restoreBoard(board: Board) {
     setStatus(null);
-
-    const { error: cardsError } = await supabase
-      .from("cards")
-      .delete()
-      .eq("board_id", selectedBoardId);
-    if (cardsError) {
-      setStatus(cardsError.message);
-      return;
-    }
-
     const { error: boardError } = await supabase
       .from("boards")
-      .delete()
-      .eq("id", selectedBoardId);
+      .update({ deleted_at: null })
+      .eq("id", board.id);
     if (boardError) {
       setStatus(boardError.message);
       return;
     }
 
-    setSelectedBoardId("");
+    let cardsQuery = supabase
+      .from("cards")
+      .update({ deleted_at: null })
+      .eq("board_id", board.id);
+    if (board.deleted_at) {
+      cardsQuery = cardsQuery.eq("deleted_at", board.deleted_at);
+    } else {
+      cardsQuery = cardsQuery.not("deleted_at", "is", null);
+    }
+
+    const { error: cardsError } = await cardsQuery;
+    if (cardsError) {
+      setStatus(cardsError.message);
+      return;
+    }
+
     if (userId) {
       await loadBoards(userId);
+      await loadDeletedBoards(userId);
     }
-    setCards([]);
-    setStatus("Board deleted ✅");
+    setStatus("Board restored ✅");
   }
-  async function deleteCard(cardId: string) {
-    if (!selectedBoardId) return;
-    const ok = window.confirm("Delete this card? This cannot be undone.");
-    if (!ok) return;
-    setStatus(null);
 
-    const { error } = await supabase.from("cards").delete().eq("id", cardId);
+  async function restoreCard(cardId: string) {
+    if (!selectedBoardId) return;
+    setStatus(null);
+    const { error } = await supabase
+      .from("cards")
+      .update({ deleted_at: null })
+      .eq("id", cardId);
     if (error) {
       setStatus(error.message);
       return;
     }
     await loadCards(selectedBoardId);
-    setStatus("Card deleted ✅");
+    if (showDeletedCards) {
+      await loadDeletedCards(selectedBoardId);
+    }
+    setStatus("Card restored ✅");
   }
 
 
@@ -487,6 +623,30 @@ export default function DashboardClient() {
 
   return (
     <main className="p-8 max-w-3xl space-y-10">
+      {confirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold">{confirm.title}</h2>
+            <p className="mt-2 text-sm text-gray-600">{confirm.message}</p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl border px-4 py-2"
+                onClick={() => setConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-red-600 px-4 py-2 text-white"
+                onClick={() => confirm.onConfirm()}
+              >
+                {confirm.confirmLabel ?? "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {showProfileForm ? (
         <section className="space-y-3">
           <header className="space-y-1">
@@ -494,7 +654,15 @@ export default function DashboardClient() {
             <p className="text-gray-600">
               Add your name and a profile photo to continue.
             </p>
-            {status ? <div className="text-sm text-red-600">{status}</div> : null}
+            {status ? (
+              <div
+                className={`text-sm ${
+                  statusKind === "success" ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {status}
+              </div>
+            ) : null}
           </header>
 
           <form onSubmit={saveProfile} className="space-y-3">
@@ -544,6 +712,17 @@ export default function DashboardClient() {
 
       {isOnboarding && needsProfile ? null : (
         <section className="space-y-3">
+        {status && !showProfileForm ? (
+          <div
+            className={`rounded-xl border px-3 py-2 text-sm ${
+              statusKind === "success"
+                ? "border-green-200 bg-green-50 text-green-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {status}
+          </div>
+        ) : null}
         {!showProfileForm && profileLoaded ? (
           <div className="flex items-center gap-3">
             <Link href="/profile" className="flex items-center gap-3">
@@ -570,7 +749,16 @@ export default function DashboardClient() {
             </button>
           </div>
         ) : null}
-        <h2 className="text-xl font-semibold">Your boards</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xl font-semibold">Your boards</h2>
+          <button
+            type="button"
+            className="text-sm underline"
+            onClick={() => setShowTrash((prev) => !prev)}
+          >
+            {showTrash ? "Hide trash" : "Show trash"}
+          </button>
+        </div>
 
         <div className="flex gap-2 items-center flex-wrap">
           <select
@@ -601,6 +789,7 @@ export default function DashboardClient() {
                   : "View private page →"}
               </a>
               <button
+                type="button"
                 className="text-sm text-red-600 hover:underline"
                 onClick={deleteBoard}
               >
@@ -698,6 +887,41 @@ export default function DashboardClient() {
             Create board
           </button>
         </form>
+
+        {showTrash ? (
+          <div className="rounded-2xl border bg-gray-50 p-3">
+            <h3 className="font-semibold">Trash</h3>
+            {deletedBoards.length === 0 ? (
+              <p className="text-sm text-gray-600">No deleted boards.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {deletedBoards.map((board) => (
+                  <li
+                    key={board.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold">{board.title}</div>
+                      {board.deleted_at ? (
+                        <div className="text-xs text-gray-500">
+                          Deleted{" "}
+                          {new Date(board.deleted_at).toLocaleString()}
+                        </div>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-lg border px-3 py-1 text-sm"
+                      onClick={() => restoreBoard(board)}
+                    >
+                      Restore
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
         </section>
       )}
 
@@ -733,7 +957,16 @@ export default function DashboardClient() {
         </form>
 
         <div className="space-y-2">
-          <h3 className="font-semibold">Cards</h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-semibold">Cards</h3>
+            <button
+              type="button"
+              className="text-sm underline"
+              onClick={() => setShowDeletedCards((prev) => !prev)}
+            >
+              {showDeletedCards ? "Hide deleted" : "Show deleted"}
+            </button>
+          </div>
           {cards.length === 0 ? (
             <p className="text-gray-600 text-sm">No cards yet.</p>
           ) : (
@@ -803,6 +1036,7 @@ export default function DashboardClient() {
                     />
                     <div className="mt-2">
                       <button
+                        type="button"
                         className="text-sm text-red-600 hover:underline"
                         onClick={() => deleteCard(c.id)}
                       >
@@ -814,6 +1048,43 @@ export default function DashboardClient() {
               ))}
             </ul>
           )}
+
+          {showDeletedCards ? (
+            <div className="mt-3 space-y-2">
+              <h4 className="text-sm font-semibold">Deleted cards</h4>
+              {deletedCards.length === 0 ? (
+                <p className="text-sm text-gray-600">No deleted cards.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {deletedCards.map((c) => (
+                    <li
+                      key={c.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-gray-50 px-3 py-2"
+                    >
+                      <div>
+                        <div className="text-sm font-semibold">
+                          {c.title ?? "Untitled"}
+                        </div>
+                        {c.deleted_at ? (
+                          <div className="text-xs text-gray-500">
+                            Deleted{" "}
+                            {new Date(c.deleted_at).toLocaleString()}
+                          </div>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        className="rounded-lg border px-3 py-1 text-sm"
+                        onClick={() => restoreCard(c.id)}
+                      >
+                        Restore
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
         </div>
         </section>
       )}

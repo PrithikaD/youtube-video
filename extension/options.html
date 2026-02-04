@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Context Board Capture Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Capture settings</h1>
+      <p class="sub">Choose the base URL for your Context Board app.</p>
+
+      <label class="label" for="origin">Capture origin</label>
+      <input id="origin" type="url" placeholder="http://localhost:3000" />
+
+      <label class="label" for="supabase-url">Supabase URL</label>
+      <input id="supabase-url" type="url" placeholder="https://xxxxx.supabase.co" />
+
+      <label class="label" for="supabase-key">Supabase anon key</label>
+      <input id="supabase-key" type="text" placeholder="anon key" />
+
+      <div class="actions">
+        <button id="save" class="primary">Save</button>
+        <div class="status" id="status"></div>
+      </div>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import CardModal from "./CardModal";
 import YouTubeEmbed from "./YouTubeEmbed";
 import { getYouTubeThumbnailUrl, getYouTubeVideoId } from "../lib/youtube";
@@ -49,8 +50,24 @@ export default function BoardClient({
             />
           ) : null}
         </div>
-        <div className="text-sm text-gray-700">
-          {profileName ?? "Unknown"}
+        <div>
+          <div className="text-sm text-gray-700">
+            {profileName ?? "Unknown"}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Link
+              href="/profile"
+              className="inline-flex items-center rounded-lg border px-3 py-1.5 text-xs"
+            >
+              View profile
+            </Link>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center rounded-lg border px-3 py-1.5 text-xs"
+            >
+              Back to dashboard
+            </Link>
+          </div>
         </div>
       </div>
 

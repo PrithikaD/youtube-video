@@ -39,6 +39,7 @@ export default async function InvitePage({
       .from("boards")
       .select("slug")
       .eq("id", boardId)
+      .is("deleted_at", null)
       .maybeSingle();
     boardSlug = boardFromId?.slug ?? null;
   }

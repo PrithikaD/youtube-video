@@ -1,0 +1,13 @@
+{
+  "name": "Context Board Capture",
+  "description": "Save YouTube videos to your Context Board dashboard.",
+  "version": "0.1.0",
+  "manifest_version": 3,
+  "action": {
+    "default_title": "Capture to Context Board",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "host_permissions": ["<all_urls>"]
+}

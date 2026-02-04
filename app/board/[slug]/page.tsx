@@ -12,8 +12,9 @@ export default async function BoardPage({
 
   const { data: board, error: boardError } = await supabase
     .from("boards")
-    .select("id, title, slug, description, is_public, creator_id")
+    .select("id, title, slug, description, is_public, creator_id, deleted_at")
     .eq("slug", slug)
+    .is("deleted_at", null)
     .single();
 
   if (boardError || !board) {
@@ -59,6 +60,7 @@ export default async function BoardPage({
       "id, url, title, thumbnail_url, creator_note, created_at, source_type, youtube_video_id, youtube_timestamp"
     )
     .eq("board_id", board.id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (cardsError) {
