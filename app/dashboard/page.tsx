@@ -23,7 +23,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-6">
-        <DashboardClient userId={user.id} />
+        <DashboardClient />
       </div>
     </main>
   );

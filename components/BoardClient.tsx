@@ -18,13 +18,13 @@ type Card = {
 
 export default function BoardClient({
   boardTitle,
-  boardSlug,
+  boardDescription,
   cards,
   profileName,
   profileAvatarUrl,
 }: {
   boardTitle: string;
-  boardSlug: string;
+  boardDescription?: string | null;
   cards: Card[];
   profileName?: string | null;
   profileAvatarUrl?: string | null;
@@ -55,7 +55,9 @@ export default function BoardClient({
       </div>
 
       <h1 className="mt-3 text-4xl font-bold">{boardTitle}</h1>
-      <p className="mt-2 text-gray-600">/{boardSlug}</p>
+      {boardDescription ? (
+        <p className="mt-2 text-gray-600">{boardDescription}</p>
+      ) : null}
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => {

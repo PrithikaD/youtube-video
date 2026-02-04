@@ -12,7 +12,7 @@ export default async function BoardPage({
 
   const { data: board, error: boardError } = await supabase
     .from("boards")
-    .select("id, title, slug, is_public, creator_id")
+    .select("id, title, slug, description, is_public, creator_id")
     .eq("slug", slug)
     .single();
 
@@ -23,6 +23,34 @@ export default async function BoardPage({
         <p className="mt-2 text-gray-600">Slug: {slug}</p>
       </main>
     );
+  }
+
+  if (!board.is_public) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let isMember = false;
+    if (user && user.id !== board.creator_id) {
+      const { data: membership } = await supabase
+        .from("board_members")
+        .select("board_id")
+        .eq("board_id", board.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      isMember = Boolean(membership);
+    }
+
+    if (!user || (user.id !== board.creator_id && !isMember)) {
+      return (
+        <main className="p-8">
+          <h1 className="text-2xl font-semibold">Private board</h1>
+          <p className="mt-2 text-gray-600">
+            You need access from the board owner to view this board.
+          </p>
+        </main>
+      );
+    }
   }
 
   const { data: cards, error: cardsError } = await supabase
@@ -53,7 +81,7 @@ export default async function BoardPage({
   return (
     <BoardClient
       boardTitle={board.title}
-      boardSlug={board.slug}
+      boardDescription={board.description ?? null}
       cards={cards ?? []}
       profileName={profile?.full_name ?? null}
       profileAvatarUrl={profile?.avatar_url ?? null}
