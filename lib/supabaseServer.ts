@@ -9,6 +9,7 @@ export async function createSupabaseServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
+        encode: "tokens-only",
         getAll() {
           return cookieStore.getAll();
         },
@@ -25,4 +26,3 @@ export async function createSupabaseServerClient() {
     }
   );
 }
-
