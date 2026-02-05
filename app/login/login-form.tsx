@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "../../lib/supabaseBrowserClient";
 import { useRouter } from "next/navigation";
 
 export default function LoginForm({
@@ -23,19 +22,24 @@ export default function LoginForm({
     setError(null);
     setNotice(null);
 
-    const { data, error } =
-      mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+    const response = await fetch(
+      mode === "login" ? "/api/auth/login" : "/api/auth/signup",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      }
+    );
+    const payload = await response.json().catch(() => null);
 
     setLoading(false);
 
-    if (error) {
-      setError(error.message);
+    if (!response.ok) {
+      setError(payload?.error ?? "Unable to authenticate.");
       return;
     }
 
-    if (mode === "signup" && !data.session) {
+    if (mode === "signup" && payload?.requiresEmailConfirmation) {
       setNotice("Check your email to confirm your account, then log in.");
       return;
     }
