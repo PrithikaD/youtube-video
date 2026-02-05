@@ -603,19 +603,35 @@ export default function DashboardClient() {
     }
 
     setInviteStatus(null);
-    const { data, error } = await supabase.rpc("create_board_invite", {
-      p_board_id: selectedBoardId,
-      p_expires_at: null,
-    });
+    const selectedBoard = boards.find((board) => board.id === selectedBoardId);
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
 
-    if (error) {
-      setInviteStatus(error.message);
+    if (selectedBoard?.is_public && selectedBoard.slug) {
+      const link = `${origin}/board/${encodeURIComponent(selectedBoard.slug)}`;
+      setInviteLink(link);
+      setInviteStatus("Public board link created.");
       return;
     }
 
-    const token = data as string;
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "";
+    const response = await fetch("/api/boards/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ boardId: selectedBoardId }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setInviteStatus(payload?.error ?? "Unable to create invite link.");
+      return;
+    }
+
+    const token = payload?.token as string | undefined;
+    if (!token) {
+      setInviteStatus("Invite token missing.");
+      return;
+    }
     const link = `${origin}/invite/${encodeURIComponent(token)}`;
     setInviteLink(link);
     setInviteStatus("Invite link created.");

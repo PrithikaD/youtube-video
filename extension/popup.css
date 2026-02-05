@@ -123,6 +123,17 @@ textarea {
   gap: 6px;
 }
 
+.create-board {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .checkbox {
   display: flex;
   align-items: center;

@@ -1,6 +1,11 @@
 import LoginForm from "./login-form";
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { next?: string };
+}) {
+  const nextParam = searchParams?.next ?? null;
   return (
     <main className="p-8 max-w-md space-y-6">
       <div className="space-y-2">
@@ -9,7 +14,7 @@ export default function LoginPage() {
           Use your email and password to access your dashboard.
         </p>
       </div>
-      <LoginForm />
+      <LoginForm nextParam={nextParam} />
     </main>
   );
 }

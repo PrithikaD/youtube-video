@@ -6,6 +6,9 @@ const thumbFallbackEl = document.getElementById("thumb-fallback");
 const noteEl = document.getElementById("note");
 const boardsEl = document.getElementById("boards");
 const useInboxEl = document.getElementById("use-inbox");
+const newBoardTitleEl = document.getElementById("new-board-title");
+const newBoardPublicEl = document.getElementById("new-board-public");
+const createBoardBtn = document.getElementById("create-board");
 const saveBtn = document.getElementById("save-now");
 const openBtn = document.getElementById("open-capture");
 
@@ -313,32 +316,20 @@ async function loadBoards(session, settings) {
     return;
   }
 
-  const payload = decodeJwtPayload(session.access_token);
-  const userId = payload?.sub;
-  if (!userId) {
-    setStatus("Invalid session. Please sign in again.");
-    await clearSession();
-    updateAuthUI(null);
-    return;
-  }
-
   try {
-    const res = await fetch(
-      `${settings.supabaseUrl}/rest/v1/boards?select=id,title,slug,is_public&creator_id=eq.${userId}&order=created_at.desc`,
-      {
-        method: "GET",
-        headers: {
-          apikey: settings.supabaseAnonKey,
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      }
-    );
+    const res = await fetch(`${settings.origin}/api/extension/boards`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
 
     if (!res.ok) {
       throw new Error("Failed to load boards");
     }
 
-    const boards = await res.json();
+    const data = await res.json();
+    const boards = Array.isArray(data?.boards) ? data.boards : [];
     boardsEl.innerHTML = "";
 
     if (!boards.length) {
@@ -354,7 +345,7 @@ async function loadBoards(session, settings) {
     boards.forEach((board, index) => {
       const option = document.createElement("option");
       option.value = board.id;
-      option.textContent = board.title;
+      option.textContent = `${board.title} (${board.is_public ? "Public" : "Private"})`;
       if (index === 0) option.selected = true;
       boardsEl.appendChild(option);
     });
@@ -368,6 +359,59 @@ async function loadBoards(session, settings) {
     boardsEl.appendChild(option);
     boardsEl.disabled = true;
     setStatus("Unable to reach your app.");
+  }
+}
+
+async function createBoard(session, settings) {
+  if (!session?.access_token) {
+    setStatus("Sign in before creating boards.");
+    return;
+  }
+
+  const title = newBoardTitleEl.value.trim();
+  if (!title) {
+    setStatus("Board title is required.");
+    return;
+  }
+
+  createBoardBtn.disabled = true;
+  setStatus("");
+
+  const visibility = Boolean(newBoardPublicEl.checked);
+
+  try {
+    const res = await fetch(`${settings.origin}/api/extension/boards`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title,
+        isPublic: visibility,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setStatus(data?.error || "Could not create board.");
+      return;
+    }
+
+    const board = data?.board;
+    await loadBoards(session, settings);
+    if (board?.id) {
+      boardsEl.value = board.id;
+      useInboxEl.checked = false;
+      boardsEl.disabled = false;
+    }
+    newBoardTitleEl.value = "";
+    newBoardPublicEl.checked = true;
+    setStatus("Board created.", "success");
+  } catch {
+    setStatus("Could not create board.");
+  } finally {
+    createBoardBtn.disabled = false;
   }
 }
 
@@ -552,6 +596,11 @@ async function init() {
     saveBtn.addEventListener("click", async () => {
       const nextSession = await ensureSession(settings);
       await saveDirect(nextSession, settings);
+    });
+
+    createBoardBtn.addEventListener("click", async () => {
+      const nextSession = await ensureSession(settings);
+      await createBoard(nextSession, settings);
     });
 
     openBtn.addEventListener("click", async () => {

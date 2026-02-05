@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { supabase } from "../../lib/supabaseBrowserClient";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
-export default function LoginForm() {
+export default function LoginForm({
+  nextParam,
+}: {
+  nextParam?: string | null;
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -37,7 +40,6 @@ export default function LoginForm() {
       return;
     }
 
-    const nextParam = searchParams.get("next");
     const nextUrl =
       nextParam && nextParam.startsWith("/") ? nextParam : null;
     const fallback =
