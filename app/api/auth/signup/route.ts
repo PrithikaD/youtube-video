@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabaseRouteHandlerClient";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -13,14 +13,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await createSupabaseServerClient();
+  const { supabase, cookiesToSet } =
+    await createSupabaseRouteHandlerClient();
   const { data, error } = await supabase.auth.signUp({ email, password });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     requiresEmailConfirmation: !data.session,
   });
+  cookiesToSet.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options);
+  });
+  return response;
 }
