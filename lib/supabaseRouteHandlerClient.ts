@@ -1,10 +1,11 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
 type CookieToSet = {
   name: string;
   value: string;
-  options?: Parameters<ReturnType<typeof cookies>["set"]>[2];
+  options?: Parameters<CookieStore["set"]>[2];
 };
 
 export async function createSupabaseRouteHandlerClient() {
