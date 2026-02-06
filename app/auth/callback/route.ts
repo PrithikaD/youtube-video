@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabaseRouteHandlerClient";
+import { getSupabaseConfigError } from "@/lib/supabaseConfig";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return NextResponse.redirect(
+      new URL(`/login?error=supabase_not_configured`, url.origin)
+    );
+  }
+
   const code = url.searchParams.get("code");
   const nextParam = url.searchParams.get("next");
   const redirectPath = nextParam?.startsWith("/") ? nextParam : "/dashboard";

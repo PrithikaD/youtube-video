@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../lib/supabaseBrowserClient";
+
 import YouTubeEmbed from "../../components/YouTubeEmbed";
 import { getYouTubeThumbnailUrl, getYouTubeVideoId } from "../../lib/youtube";
 import { slugify } from "../../lib/slug";
@@ -29,6 +30,7 @@ type Card = {
 };
 
 export default function DashboardClient() {
+  const supabaseClient = supabase!;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export default function DashboardClient() {
   >(null);
 
   async function loadProfile(currentUserId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("profiles")
       .select("id, full_name, avatar_url")
       .eq("id", currentUserId)
@@ -91,7 +93,7 @@ export default function DashboardClient() {
   }
 
   async function loadBoards(currentUserId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("boards")
       .select("id,title,slug,is_public,description")
       .eq("creator_id", currentUserId)
@@ -108,7 +110,7 @@ export default function DashboardClient() {
   }
 
   async function loadDeletedBoards(currentUserId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("boards")
       .select("id,title,slug,is_public,description,deleted_at")
       .eq("creator_id", currentUserId)
@@ -124,7 +126,7 @@ export default function DashboardClient() {
   }
 
   async function loadCards(boardId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("cards")
       .select(
         "id,board_id,url,title,creator_note,thumbnail_url,created_at,deleted_at"
@@ -141,7 +143,7 @@ export default function DashboardClient() {
   }
 
   async function loadDeletedCards(boardId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("cards")
       .select(
         "id,board_id,url,title,creator_note,thumbnail_url,created_at,deleted_at"
@@ -158,7 +160,7 @@ export default function DashboardClient() {
   }
 
   async function loadUser() {
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await supabaseClient.auth.getUser();
     if (error) {
       setStatus(error.message);
       return;
@@ -256,7 +258,7 @@ export default function DashboardClient() {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("boards")
       .insert({
         creator_id: userId,
@@ -298,7 +300,7 @@ export default function DashboardClient() {
       return;
     }
 
-    const { error } = await supabase.from("cards").insert({
+    const { error } = await supabaseClient.from("cards").insert({
       board_id: selectedBoardId,
       url: url.trim(),
       title: cardTitle.trim() ? cardTitle.trim() : null,
@@ -343,7 +345,7 @@ export default function DashboardClient() {
     if (profileFile) {
       const ext = profileFile.name.split(".").pop() || "jpg";
       const path = `${userId}/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabaseClient.storage
         .from("avatars")
         .upload(path, profileFile, { upsert: true });
 
@@ -352,11 +354,11 @@ export default function DashboardClient() {
         return;
       }
 
-      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+      const { data } = supabaseClient.storage.from("avatars").getPublicUrl(path);
       avatarUrl = data.publicUrl;
     }
 
-    const { error } = await supabase.from("profiles").upsert({
+    const { error } = await supabaseClient.from("profiles").upsert({
       id: userId,
       full_name: trimmedName ? trimmedName : null,
       avatar_url: avatarUrl ?? null,
@@ -404,7 +406,7 @@ export default function DashboardClient() {
         setStatus(null);
         const deletedAt = new Date().toISOString();
 
-        const { error: cardsError } = await supabase
+        const { error: cardsError } = await supabaseClient
           .from("cards")
           .update({ deleted_at: deletedAt })
           .eq("board_id", selectedBoardId);
@@ -413,7 +415,7 @@ export default function DashboardClient() {
           return;
         }
 
-        const { error: boardError } = await supabase
+        const { error: boardError } = await supabaseClient
           .from("boards")
           .update({ deleted_at: deletedAt })
           .eq("id", selectedBoardId);
@@ -445,7 +447,7 @@ export default function DashboardClient() {
         setStatus(null);
         const deletedAt = new Date().toISOString();
 
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from("cards")
           .update({ deleted_at: deletedAt })
           .eq("id", cardId);
@@ -464,7 +466,7 @@ export default function DashboardClient() {
 
   async function restoreBoard(board: Board) {
     setStatus(null);
-    const { error: boardError } = await supabase
+    const { error: boardError } = await supabaseClient
       .from("boards")
       .update({ deleted_at: null })
       .eq("id", board.id);
@@ -473,7 +475,7 @@ export default function DashboardClient() {
       return;
     }
 
-    let cardsQuery = supabase
+    let cardsQuery = supabaseClient
       .from("cards")
       .update({ deleted_at: null })
       .eq("board_id", board.id);
@@ -499,7 +501,7 @@ export default function DashboardClient() {
   async function restoreCard(cardId: string) {
     if (!selectedBoardId) return;
     setStatus(null);
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("cards")
       .update({ deleted_at: null })
       .eq("id", cardId);
@@ -517,7 +519,7 @@ export default function DashboardClient() {
 
   async function updateCardTitle(cardId: string, rawTitle: string) {
     const title = rawTitle.trim();
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("cards")
       .update({ title: title ? title : null })
       .eq("id", cardId);
@@ -535,7 +537,7 @@ export default function DashboardClient() {
 
   async function updateCardNote(cardId: string, rawNote: string) {
     const creatorNote = rawNote.trim();
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("cards")
       .update({ creator_note: creatorNote ? creatorNote : null })
       .eq("id", cardId);
@@ -568,7 +570,7 @@ export default function DashboardClient() {
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("boards")
       .update({
         title,

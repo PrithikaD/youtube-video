@@ -77,13 +77,17 @@ export function getYouTubeEmbedUrl(opts: {
   videoId: string;
   startSeconds?: number;
   autoplay?: boolean;
+  muted?: boolean;
 }): string {
   const start = Math.max(0, Math.floor(opts.startSeconds ?? 0));
   const autoplay = opts.autoplay ? 1 : 0;
+  const muted = opts.muted ? 1 : 0;
   const params = new URLSearchParams();
   if (start) params.set("start", String(start));
   if (autoplay) params.set("autoplay", String(autoplay));
+  params.set("mute", String(muted));
+  params.set("playsinline", "1");
+  params.set("modestbranding", "1");
   params.set("rel", "0");
   return `https://www.youtube-nocookie.com/embed/${opts.videoId}?${params.toString()}`;
 }
-
