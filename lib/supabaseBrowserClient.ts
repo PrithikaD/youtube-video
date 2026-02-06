@@ -36,8 +36,9 @@ function serializeCookie(
   if (options.expires) {
     cookie += `; Expires=${options.expires.toUTCString()}`;
   }
-  if (options.path) {
-    cookie += `; Path=${options.path}`;
+  const path = options.path ?? "/";
+  if (path) {
+    cookie += `; Path=${path}`;
   }
   if (options.sameSite) {
     const sameSite =
@@ -67,6 +68,11 @@ export function getSupabaseBrowserClient(): SupabaseClient {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
+        cookieOptions: {
+          path: "/",
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        },
         cookies: {
           encode: "tokens-only",
           getAll() {

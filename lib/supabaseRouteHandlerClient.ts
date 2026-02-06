@@ -20,8 +20,10 @@ export async function createSupabaseRouteHandlerClient() {
     {
       cookieEncoding: "raw",
       cookieOptions: {
+        path: "/",
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
+        httpOnly: false,
       },
       cookies: {
         encode: "tokens-only",
