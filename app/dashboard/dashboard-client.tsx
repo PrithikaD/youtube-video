@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getSupabaseBrowserClient } from "../../lib/supabaseBrowserClient";
+import { supabase } from "../../lib/supabaseBrowserClient";
 import YouTubeEmbed from "../../components/YouTubeEmbed";
 import { getYouTubeThumbnailUrl, getYouTubeVideoId } from "../../lib/youtube";
 import { slugify } from "../../lib/slug";
@@ -29,7 +29,6 @@ type Card = {
 };
 
 export default function DashboardClient() {
-  const supabase = getSupabaseBrowserClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);

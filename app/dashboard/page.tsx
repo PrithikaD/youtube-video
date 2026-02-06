@@ -1,24 +1,31 @@
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "../../lib/supabaseServer";
-import { getSupabaseConfigError } from "../../lib/supabaseConfig";
-import SupabaseEnvNotice from "../../components/SupabaseEnvNotice";
-import DashboardClient from "./dashboard-client";
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabaseBrowserClient";
 
-export default async function DashboardPage() {
-  const configError = getSupabaseConfigError();
-  if (configError) {
-    return <SupabaseEnvNotice />;
-  }
+const DashboardClient = dynamic(() => import("./dashboard-client"), {
+  ssr: false,
+  loading: () => <p>Loading dashboard...</p>,
+});
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function DashboardPage() {
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
 
-  if (!user) {
-    redirect("/login");
-  }
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        router.replace("/login");
+      } else {
+        setReady(true);
+      }
+    });
+  }, [router]);
+
+  if (!ready) return <p className="p-8">Loading dashboard...</p>;
 
   return (
     <main className="p-8">

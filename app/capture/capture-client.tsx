@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { getSupabaseBrowserClient } from "../../lib/supabaseBrowserClient";
+import { supabase } from "../../lib/supabaseBrowserClient";
 import {
   getYouTubeStartSeconds,
   getYouTubeThumbnailUrl,
@@ -30,7 +30,6 @@ export default function CaptureClient({
   profileName,
   profileAvatarUrl,
 }: CaptureClientProps) {
-  const supabase = getSupabaseBrowserClient();
   const searchParams = useSearchParams();
   const [boards, setBoards] = useState<Board[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState("");

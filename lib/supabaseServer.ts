@@ -6,32 +6,14 @@ export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
   const { url, anonKey } = getSupabaseConfig();
 
-  return createServerClient(
-    url,
-    anonKey,
-    {
-      cookieEncoding: "raw",
-      cookieOptions: {
-        path: "/",
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: false,
+  return createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
       },
-      cookies: {
-        encode: "tokens-only",
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // In some Server Component contexts, setting cookies is disallowed.
-          }
-        },
+      setAll() {
+        // no-op: Server Components cannot set cookies
       },
-    }
-  );
+    },
+  });
 }
