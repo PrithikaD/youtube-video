@@ -1,13 +1,9 @@
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../../lib/supabaseServer";
 import { getSupabaseConfigError } from "../../lib/supabaseConfig";
 import SupabaseEnvNotice from "../../components/SupabaseEnvNotice";
-const DashboardClient = dynamic(() => import("./dashboard-client"), {
-  ssr: false,
-  loading: () => <p>Loading dashboard...</p>,
-});
+import DashboardClient from "./dashboard-client";
 
 export default async function DashboardPage() {
   const configError = getSupabaseConfigError();
