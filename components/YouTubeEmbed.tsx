@@ -46,6 +46,7 @@ export default function YouTubeEmbed({
     videoId,
     startSeconds,
     autoplay: true,
+    muted: false,
   });
 
   return (
@@ -95,4 +96,3 @@ export default function YouTubeEmbed({
     </div>
   );
 }
-

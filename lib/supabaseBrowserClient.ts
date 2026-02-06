@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { getSupabaseConfigError } from "./supabaseConfig";
 
 function parseCookieString(cookieString: string) {
   const result: Record<string, string> = {};
@@ -48,24 +49,30 @@ function serializeCookie(
   return cookie;
 }
 
-export const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    cookies: {
-      encode: "tokens-only",
-      getAll() {
-        const parsed = parseCookieString(document.cookie);
-        return Object.keys(parsed).map((name) => ({
-          name,
-          value: parsed[name],
-        }));
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          document.cookie = serializeCookie(name, value, options);
-        });
-      },
-    },
-  }
-);
+const configError = getSupabaseConfigError();
+
+export const supabase = !configError
+  ? createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          encode: "tokens-only",
+          getAll() {
+            const parsed = parseCookieString(document.cookie);
+            return Object.keys(parsed).map((name) => ({
+              name,
+              value: parsed[name],
+            }));
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              document.cookie = serializeCookie(name, value, options);
+            });
+          },
+        },
+      }
+    )
+  : null;
+
+export const supabaseBrowserClientConfigError = configError;

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { getSupabaseConfig } from "./supabaseConfig";
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
 type CookieToSet = {
@@ -11,10 +12,11 @@ type CookieToSet = {
 export async function createSupabaseRouteHandlerClient() {
   const cookieStore = await cookies();
   const cookiesToSet: CookieToSet[] = [];
+  const { url, anonKey } = getSupabaseConfig();
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookieEncoding: "raw",
       cookieOptions: {

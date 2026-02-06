@@ -37,7 +37,12 @@ export default function CardModal({
   const isYouTube = Boolean(videoId);
 
   const embedSrc = isYouTube
-    ? getYouTubeEmbedUrl({ videoId: videoId!, startSeconds: start, autoplay: true })
+    ? getYouTubeEmbedUrl({
+        videoId: videoId!,
+        startSeconds: start,
+        autoplay: false,
+        muted: false,
+      })
     : "";
 
   return (

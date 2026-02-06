@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../../lib/supabaseServer";
+import { getSupabaseConfigError } from "../../lib/supabaseConfig";
+import SupabaseEnvNotice from "../../components/SupabaseEnvNotice";
 
 type SearchParams = {
   view?: string;
@@ -11,6 +13,11 @@ export default async function ProfilePage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return <SupabaseEnvNotice />;
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

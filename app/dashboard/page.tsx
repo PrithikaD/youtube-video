@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../../lib/supabaseServer";
+import { getSupabaseConfigError } from "../../lib/supabaseConfig";
+import SupabaseEnvNotice from "../../components/SupabaseEnvNotice";
 import DashboardClient from "./dashboard-client";
 
 export default async function DashboardPage() {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return <SupabaseEnvNotice />;
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

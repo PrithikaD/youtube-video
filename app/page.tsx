@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../lib/supabaseServer";
+import { getSupabaseConfigError } from "../lib/supabaseConfig";
+import SupabaseEnvNotice from "../components/SupabaseEnvNotice";
 
 export default async function Home() {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return <SupabaseEnvNotice title="Set up Supabase to continue" />;
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -21,7 +28,7 @@ export default async function Home() {
           href="/login"
           className="w-fit rounded-xl bg-black px-5 py-2.5 text-white"
         >
-          Let's get started
+          Let&apos;s get started
         </Link>
       </div>
     </main>

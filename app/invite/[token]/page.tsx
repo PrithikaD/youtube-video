@@ -1,11 +1,18 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { getSupabaseConfigError } from "../../../lib/supabaseConfig";
+import SupabaseEnvNotice from "../../../components/SupabaseEnvNotice";
 
 export default async function InvitePage({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return <SupabaseEnvNotice />;
+  }
+
   const { token: rawToken } = await params;
   const token = decodeURIComponent(rawToken);
   const supabase = await createSupabaseServerClient();

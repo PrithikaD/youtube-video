@@ -1,11 +1,18 @@
 import BoardClient from "../../../components/BoardClient";
 import { createSupabaseServerClient } from "../../../lib/supabaseServer";
+import { getSupabaseConfigError } from "../../../lib/supabaseConfig";
+import SupabaseEnvNotice from "../../../components/SupabaseEnvNotice";
 
 export default async function BoardPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return <SupabaseEnvNotice />;
+  }
+
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
   const supabase = await createSupabaseServerClient();

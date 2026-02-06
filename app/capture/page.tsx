@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../../lib/supabaseServer";
+import { getSupabaseConfigError } from "../../lib/supabaseConfig";
+import SupabaseEnvNotice from "../../components/SupabaseEnvNotice";
 import CaptureClient from "./capture-client";
 
 type CapturePageProps = {
@@ -20,6 +22,11 @@ function buildNextPath(searchParams: CapturePageProps["searchParams"]) {
 }
 
 export default async function CapturePage({ searchParams }: CapturePageProps) {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return <SupabaseEnvNotice />;
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
 

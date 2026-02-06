@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabaseRouteHandlerClient";
+import { getSupabaseConfigError } from "@/lib/supabaseConfig";
 
 export async function POST(request: Request) {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return NextResponse.json({ error: configError }, { status: 500 });
+  }
+
   const body = await request.json().catch(() => null);
   const email = body?.email as string | undefined;
   const password = body?.password as string | undefined;
