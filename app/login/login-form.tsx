@@ -16,21 +16,41 @@ export default function LoginForm({
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  async function loginWithCookie(emailValue: string, passwordValue: string) {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailValue, password: passwordValue }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Login failed");
+
+    window.location.href = "/dashboard";
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setNotice(null);
 
-    const response = await fetch(
-      mode === "login" ? "/api/auth/login" : "/api/auth/signup",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
+    if (mode === "login") {
+      try {
+        await loginWithCookie(email, password);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Login failed");
+        setLoading(false);
       }
-    );
+      return;
+    }
+
+    const response = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    });
     const payload = await response.json().catch(() => null);
 
     setLoading(false);
@@ -40,16 +60,14 @@ export default function LoginForm({
       return;
     }
 
-    if (mode === "signup" && payload?.requiresEmailConfirmation) {
+    if (payload?.requiresEmailConfirmation) {
       setNotice("Check your email to confirm your account, then log in.");
       return;
     }
 
     const nextUrl =
       nextParam && nextParam.startsWith("/") ? nextParam : null;
-    const fallback =
-      mode === "signup" ? "/dashboard?onboarding=1" : "/dashboard";
-    router.push(nextUrl ?? fallback);
+    router.push(nextUrl ?? "/dashboard?onboarding=1");
     router.refresh();
   }
 

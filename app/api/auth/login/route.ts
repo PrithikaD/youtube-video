@@ -1,32 +1,30 @@
 import { NextResponse } from "next/server";
-import { createSupabaseRouteHandlerClient } from "@/lib/supabaseRouteHandlerClient";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
-  const email = body?.email as string | undefined;
-  const password = body?.password as string | undefined;
+export async function POST(req: Request) {
+  const { email, password } = await req.json();
 
-  if (!email || !password) {
-    return NextResponse.json(
-      { error: "Email and password are required." },
-      { status: 400 }
-    );
-  }
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: (list) =>
+          list.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          ),
+      },
+    }
+  );
 
-  const { supabase, cookiesToSet } =
-    await createSupabaseRouteHandlerClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: error.message }, { status: 401 });
   }
 
-  const response = NextResponse.json({ user: data.user });
-  cookiesToSet.forEach(({ name, value, options }) => {
-    response.cookies.set(name, value, options);
-  });
-  return response;
+  return NextResponse.json({ ok: true });
 }
