@@ -19,7 +19,7 @@ const logoutBtn = document.getElementById("logout");
 const emailEl = document.getElementById("email");
 const passwordEl = document.getElementById("password");
 
-const DEFAULT_ORIGIN = "http://localhost:3000";
+const DEFAULT_ORIGIN = "https://curator-board-sigma.vercel.app";
 const DEFAULT_SUPABASE_URL = "https://ckpdvjiuucxjjbalqllr.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrcGR2aml1dWN4ampiYWxxbGxyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MzkzOTksImV4cCI6MjA4NTAxNTM5OX0.sFWjQm3LXDEi4blFHmnKZ-BWzh1Gvrejr7P4K8tsTbc";
@@ -29,23 +29,12 @@ let captureData = {
   title: "",
   thumbnail: "",
 };
+let supabaseClient = null;
+let supabaseClientKey = "";
 
 function setStatus(message, tone = "error") {
   statusEl.textContent = message || "";
   statusEl.style.color = tone === "success" ? "#1f7a1f" : "#b00020";
-}
-
-function decodeJwtPayload(token) {
-  try {
-    const payload = token.split(".")[1];
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded =
-      normalized + "===".slice((normalized.length + 3) % 4);
-    const json = atob(padded);
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
 }
 
 function getSettings() {
@@ -67,60 +56,29 @@ function getSettings() {
   });
 }
 
-function getStoredSession() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get({ authSession: null }, (items) => {
-      resolve(items.authSession || null);
-    });
-  });
-}
-
-function setStoredSession(session) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set({ authSession: session }, () => resolve());
-  });
-}
-
-async function clearSession() {
-  await setStoredSession(null);
-}
-
-async function refreshSession(settings, session) {
-  if (!session?.refresh_token) return null;
-  try {
-    const res = await fetch(
-      `${settings.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
+function getSupabaseClient(settings) {
+  const key = `${settings.supabaseUrl}|${settings.supabaseAnonKey}`;
+  if (!supabaseClient || supabaseClientKey !== key) {
+    supabaseClientKey = key;
+    supabaseClient = window.supabase.createClient(
+      settings.supabaseUrl,
+      settings.supabaseAnonKey,
       {
-        method: "POST",
-        headers: {
-          apikey: settings.supabaseAnonKey,
-          "Content-Type": "application/json",
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
         },
-        body: JSON.stringify({ refresh_token: session.refresh_token }),
       }
     );
-
-    if (!res.ok) return null;
-    const data = await res.json();
-    const next = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: Date.now() + data.expires_in * 1000,
-      user: data.user,
-    };
-    await setStoredSession(next);
-    return next;
-  } catch {
-    return null;
   }
+  return supabaseClient;
 }
 
-async function ensureSession(settings) {
-  const session = await getStoredSession();
-  if (!session) return null;
-  const expiresAt = session.expires_at || 0;
-  if (Date.now() + 60000 < expiresAt) return session;
-  return refreshSession(settings, session);
+async function getSession(settings) {
+  const client = getSupabaseClient(settings);
+  const { data, error } = await client.auth.getSession();
+  if (error) return null;
+  return data.session || null;
 }
 
 async function login(settings) {
@@ -130,56 +88,25 @@ async function login(settings) {
     setStatus("Email and password required.");
     return null;
   }
-  try {
-    const res = await fetch(
-      `${settings.supabaseUrl}/auth/v1/token?grant_type=password`,
-      {
-        method: "POST",
-        headers: {
-          apikey: settings.supabaseAnonKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      }
-    );
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setStatus(data.error_description || "Login failed.");
-      return null;
-    }
-
-    const data = await res.json();
-    const next = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: Date.now() + data.expires_in * 1000,
-      user: data.user,
-    };
-    await setStoredSession(next);
-    return next;
-  } catch {
-    setStatus("Login failed.");
+  const client = getSupabaseClient(settings);
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) {
+    setStatus(error.message || "Login failed.");
     return null;
   }
+  return data.session || null;
 }
 
-async function logout(settings, session) {
-  if (session?.access_token) {
-    try {
-      await fetch(`${settings.supabaseUrl}/auth/v1/logout`, {
-        method: "POST",
-        headers: {
-          apikey: settings.supabaseAnonKey,
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-      });
-    } catch {
-      // ignore
-    }
+async function logout(settings) {
+  const client = getSupabaseClient(settings);
+  try {
+    await client.auth.signOut();
+  } catch {
+    // ignore
   }
-  await clearSession();
 }
 
 function updateAuthUI(session) {
@@ -469,11 +396,9 @@ async function saveDirect(session, settings) {
     return;
   }
 
-  const payload = decodeJwtPayload(session.access_token);
-  const userId = payload?.sub;
+  const userId = session?.user?.id;
   if (!userId) {
     setStatus("Invalid session. Please sign in again.");
-    await clearSession();
     updateAuthUI(null);
     saveBtn.disabled = false;
     return;
@@ -536,7 +461,7 @@ async function saveDirect(session, settings) {
 async function init() {
   try {
     const settings = await getSettings();
-    const session = await ensureSession(settings);
+    const session = await getSession(settings);
     updateAuthUI(session);
 
     setStatus("Reading this page...");
@@ -586,20 +511,19 @@ async function init() {
     });
 
     logoutBtn.addEventListener("click", async () => {
-      const current = await ensureSession(settings);
-      await logout(settings, current);
+      await logout(settings);
       updateAuthUI(null);
       await loadBoards(null, settings);
       setStatus("Signed out.", "success");
     });
 
     saveBtn.addEventListener("click", async () => {
-      const nextSession = await ensureSession(settings);
+      const nextSession = await getSession(settings);
       await saveDirect(nextSession, settings);
     });
 
     createBoardBtn.addEventListener("click", async () => {
-      const nextSession = await ensureSession(settings);
+      const nextSession = await getSession(settings);
       await createBoard(nextSession, settings);
     });
 

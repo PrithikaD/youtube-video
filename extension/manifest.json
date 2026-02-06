@@ -9,5 +9,5 @@
   },
   "options_page": "options.html",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
-  "host_permissions": ["<all_urls>"]
+  "host_permissions": ["https://curator-board-sigma.vercel.app/*"]
 }

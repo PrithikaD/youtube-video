@@ -4,7 +4,7 @@ const supabaseKeyInput = document.getElementById("supabase-key");
 const saveBtn = document.getElementById("save");
 const statusEl = document.getElementById("status");
 
-const DEFAULT_ORIGIN = "http://localhost:3000";
+const DEFAULT_ORIGIN = "https://curator-board-sigma.vercel.app";
 const DEFAULT_SUPABASE_URL = "https://ckpdvjiuucxjjbalqllr.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrcGR2aml1dWN4ampiYWxxbGxyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MzkzOTksImV4cCI6MjA4NTAxNTM5OX0.sFWjQm3LXDEi4blFHmnKZ-BWzh1Gvrejr7P4K8tsTbc";

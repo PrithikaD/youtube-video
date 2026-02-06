@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getYouTubeStartSeconds,
   getYouTubeThumbnailUrl,
@@ -20,7 +22,7 @@ function withCors(request: Request, response: NextResponse) {
   response.headers.set("Access-Control-Allow-Origin", origin);
   response.headers.set("Access-Control-Allow-Credentials", "true");
   response.headers.set("Access-Control-Allow-Methods", "POST,OPTIONS");
-  response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
   response.headers.set("Vary", "Origin");
   return response;
 }
@@ -30,8 +32,10 @@ export async function OPTIONS(request: Request) {
   return withCors(request, response);
 }
 
-async function getOrCreateInboxBoardId(userId: string) {
-  const supabase = await createSupabaseServerClient();
+async function getOrCreateInboxBoardId(
+  supabase: SupabaseClient,
+  userId: string
+) {
   const { data: existing } = await supabase
     .from("boards")
     .select("id,deleted_at")
@@ -68,11 +72,44 @@ async function getOrCreateInboxBoardId(userId: string) {
   return data?.id ?? null;
 }
 
-export async function POST(request: Request) {
-  const supabase = await createSupabaseServerClient();
-  const { data: authData, error: authError } = await supabase.auth.getUser();
+function getBearerToken(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader) return null;
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ?? null;
+}
 
-  if (authError || !authData.user) {
+async function getAuthedClient(request: Request) {
+  const token = getBearerToken(request);
+  if (token) {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      }
+    );
+    const { data, error } = await supabase.auth.getUser(token);
+    return { supabase, user: data.user, error };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.getUser();
+  return { supabase, user: data.user, error };
+}
+
+export async function POST(request: Request) {
+  const { supabase, user, error: authError } = await getAuthedClient(request);
+
+  if (authError || !user) {
     const response = NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }
@@ -110,7 +147,7 @@ export async function POST(request: Request) {
 
   let boardId = body.boardId ?? "";
   if (body.useInbox || !boardId) {
-    const inboxId = await getOrCreateInboxBoardId(authData.user.id);
+    const inboxId = await getOrCreateInboxBoardId(supabase, user.id);
     if (!inboxId) {
       const response = NextResponse.json(
         { error: "Unable to resolve Inbox" },
