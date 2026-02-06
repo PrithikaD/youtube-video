@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseConfigError } from "./supabaseConfig";
 
 function parseCookieString(cookieString: string) {
@@ -49,10 +50,20 @@ function serializeCookie(
   return cookie;
 }
 
-const configError = getSupabaseConfigError();
+let supabaseClient: SupabaseClient | null = null;
 
-export const supabase = !configError
-  ? createBrowserClient(
+export function getSupabaseBrowserClient(): SupabaseClient {
+  if (typeof window === "undefined") {
+    throw new Error("Supabase browser client is not available on the server.");
+  }
+
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    throw new Error(configError);
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
@@ -72,7 +83,8 @@ export const supabase = !configError
           },
         },
       }
-    )
-  : null;
+    );
+  }
 
-export const supabaseBrowserClientConfigError = configError;
+  return supabaseClient;
+}

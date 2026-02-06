@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
-import { getSupabaseConfig, getSupabaseConfigError } from "@/lib/supabaseConfig";
+import { getSupabaseConfigError } from "@/lib/supabaseConfig";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabaseRouteHandlerClient";
 
 export async function POST(req: Request) {
   const configError = getSupabaseConfigError();
@@ -11,21 +10,8 @@ export async function POST(req: Request) {
 
   const { email, password } = await req.json();
 
-  const cookieStore = await cookies();
-  const { url, anonKey } = getSupabaseConfig();
-  const supabase = createServerClient(
-    url,
-    anonKey,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (list) =>
-          list.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          ),
-      },
-    }
-  );
+  const { supabase, cookiesToSet } =
+    await createSupabaseRouteHandlerClient();
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -33,5 +19,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 401 });
   }
 
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  cookiesToSet.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options);
+  });
+  return response;
 }

@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "../../lib/supabaseBrowserClient";
-
+import { getSupabaseBrowserClient } from "../../lib/supabaseBrowserClient";
 import {
   getYouTubeStartSeconds,
   getYouTubeThumbnailUrl,
@@ -31,7 +30,7 @@ export default function CaptureClient({
   profileName,
   profileAvatarUrl,
 }: CaptureClientProps) {
-  const supabaseClient = supabase!;
+  const supabase = getSupabaseBrowserClient();
   const searchParams = useSearchParams();
   const [boards, setBoards] = useState<Board[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState("");
@@ -60,7 +59,7 @@ export default function CaptureClient({
   useEffect(() => {
     async function loadBoards() {
       setLoadingBoards(true);
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from("boards")
         .select("id,title,slug,is_public")
         .eq("creator_id", userId)
@@ -90,7 +89,7 @@ export default function CaptureClient({
     const existing = boards.find((board) => board.slug === "inbox");
     if (existing) return existing.id;
 
-    const { data: inbox, error: inboxError } = await supabaseClient
+    const { data: inbox, error: inboxError } = await supabase
       .from("boards")
       .select("id,deleted_at")
       .eq("creator_id", userId)
@@ -105,7 +104,7 @@ export default function CaptureClient({
 
     if (inbox?.id) {
       if (inbox.deleted_at) {
-        const { error: restoreError } = await supabaseClient
+        const { error: restoreError } = await supabase
           .from("boards")
           .update({ deleted_at: null })
           .eq("id", inbox.id);
@@ -122,7 +121,7 @@ export default function CaptureClient({
     const title = "Inbox";
     const slug = slugify(title);
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from("boards")
       .insert({
         creator_id: userId,
@@ -145,7 +144,7 @@ export default function CaptureClient({
   }
 
   async function refreshBoards() {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from("boards")
       .select("id,title,slug,is_public")
       .eq("creator_id", userId)
@@ -190,7 +189,7 @@ export default function CaptureClient({
       ? getYouTubeStartSeconds(trimmedUrl)
       : null;
 
-    const { error } = await supabaseClient.from("cards").insert({
+    const { error } = await supabase.from("cards").insert({
       board_id: boardId,
       url: trimmedUrl,
       title: title.trim() ? title.trim() : null,
