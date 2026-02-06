@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabaseBrowserClient";
 
 export default function LoginForm({
   nextParam,
@@ -16,17 +17,15 @@ export default function LoginForm({
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function loginWithCookie(emailValue: string, passwordValue: string) {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailValue, password: passwordValue }),
+  async function login(emailValue: string, passwordValue: string) {
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: emailValue,
+      password: passwordValue,
     });
+    if (loginError) throw loginError;
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Login failed");
-
-    window.location.href = "/dashboard";
+    router.replace("/dashboard");
+    router.refresh();
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -37,7 +36,7 @@ export default function LoginForm({
 
     if (mode === "login") {
       try {
-        await loginWithCookie(email, password);
+        await login(email, password);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Login failed");
         setLoading(false);
@@ -45,22 +44,19 @@ export default function LoginForm({
       return;
     }
 
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ email, password }),
+    const { error: signupError, data } = await supabase.auth.signUp({
+      email,
+      password,
     });
-    const payload = await response.json().catch(() => null);
 
     setLoading(false);
 
-    if (!response.ok) {
-      setError(payload?.error ?? "Unable to authenticate.");
+    if (signupError) {
+      setError(signupError.message);
       return;
     }
 
-    if (payload?.requiresEmailConfirmation) {
+    if (!data.session) {
       setNotice("Check your email to confirm your account, then log in.");
       return;
     }
