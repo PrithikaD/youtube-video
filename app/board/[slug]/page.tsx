@@ -2,6 +2,13 @@ import BoardClient from "../../../components/BoardClient";
 import { createSupabaseServerClient } from "../../../lib/supabaseServer";
 import { getSupabaseConfigError } from "../../../lib/supabaseConfig";
 import SupabaseEnvNotice from "../../../components/SupabaseEnvNotice";
+import {
+  normalizeAtelierViewMode,
+  sanitizeAtelierConnectors,
+  sanitizeAtelierGroups,
+  toFiniteInteger,
+  toFiniteNumber,
+} from "../../../lib/atelierLayout";
 
 export default async function BoardPage({
   params,
@@ -19,7 +26,9 @@ export default async function BoardPage({
 
   const { data: board, error: boardError } = await supabase
     .from("boards")
-    .select("id, title, slug, description, is_public, creator_id, deleted_at")
+    .select(
+      "id, title, slug, description, is_public, creator_id, deleted_at, atelier_view_mode, atelier_groups, atelier_connectors"
+    )
     .eq("slug", slug)
     .is("deleted_at", null)
     .single();
@@ -64,7 +73,7 @@ export default async function BoardPage({
   const { data: cards, error: cardsError } = await supabase
     .from("cards")
     .select(
-      "id, url, title, thumbnail_url, creator_note, created_at, source_type, youtube_video_id, youtube_timestamp"
+      "id, url, title, thumbnail_url, creator_note, created_at, source_type, youtube_video_id, youtube_timestamp, atelier_x, atelier_y, atelier_z"
     )
     .eq("board_id", board.id)
     .is("deleted_at", null)
@@ -89,9 +98,25 @@ export default async function BoardPage({
 
   return (
     <BoardClient
+      boardId={board.id}
       boardTitle={board.title}
       boardDescription={board.description ?? null}
       cards={cards ?? []}
+      initialAtelierLayout={{
+        boardId: board.id,
+        viewMode: normalizeAtelierViewMode(board.atelier_view_mode),
+        groups: sanitizeAtelierGroups(board.atelier_groups),
+        connectors: sanitizeAtelierConnectors(board.atelier_connectors),
+        cards: (cards ?? []).map((card) => ({
+          cardId: card.id,
+          x: toFiniteNumber(card.atelier_x, 0),
+          y: toFiniteNumber(card.atelier_y, 0),
+          zIndex: toFiniteInteger(card.atelier_z, 0),
+        })),
+      }}
+      atelierLayoutApiPath={`/api/boards/${encodeURIComponent(
+        board.id
+      )}/atelier-layout`}
       profileName={profile?.full_name ?? null}
       profileAvatarUrl={profile?.avatar_url ?? null}
     />
